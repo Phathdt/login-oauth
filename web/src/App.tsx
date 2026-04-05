@@ -4,7 +4,6 @@ import { AuthProvider } from '@/contexts/auth-context'
 import { ProtectedRoute } from '@/components/protected-route'
 import { queryClient } from '@/lib/query-client'
 import LoginPage from '@/routes/login'
-import AuthCallback from '@/routes/auth-callback'
 import ProductsPage from '@/routes/products'
 
 export default function App() {
@@ -14,7 +13,6 @@ export default function App() {
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route
               path="/products"
               element={

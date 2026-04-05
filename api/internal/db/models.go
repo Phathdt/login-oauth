@@ -21,10 +21,11 @@ type RefreshToken struct {
 }
 
 type User struct {
-	ID        uuid.UUID      `json:"id"`
-	GoogleID  string         `json:"google_id"`
-	Email     string         `json:"email"`
-	Name      sql.NullString `json:"name"`
-	Picture   sql.NullString `json:"picture"`
-	CreatedAt sql.NullTime   `json:"created_at"`
+	ID          uuid.UUID      `json:"id"`
+	FirebaseUID string         `json:"firebase_uid"`
+	Provider    string         `json:"provider"`
+	Email       string         `json:"email"`
+	Name        sql.NullString `json:"name"`
+	Picture     sql.NullString `json:"picture"`
+	CreatedAt   sql.NullTime   `json:"created_at"`
 }

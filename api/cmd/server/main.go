@@ -18,7 +18,6 @@ import (
 func main() {
 	cfg := config.Load()
 
-	// pgxpool is used only for migrations (goose requires *sql.DB via stdlib).
 	pool, err := database.NewPool(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
@@ -29,7 +28,6 @@ func main() {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
 
-	// sql.DB via pgx stdlib for sqlc-generated queries.
 	sqlDB, err := database.NewSQLDB(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("failed to open sql.DB: %v", err)
@@ -38,10 +36,12 @@ func main() {
 
 	queries := dbpkg.New(sqlDB)
 
-	oauthConfig := auth.NewOAuthConfig(cfg)
+	firebaseClient, err := auth.NewFirebaseClient(cfg)
+	if err != nil {
+		log.Fatalf("failed to init firebase client: %v", err)
+	}
 
-	oauthHandler := handlers.NewOAuthHandler(cfg, oauthConfig, queries)
-	authHandler := handlers.NewAuthHandler(cfg, queries)
+	authHandler := handlers.NewAuthHandler(cfg, queries, firebaseClient)
 	productHandler := handlers.NewProductHandler()
 
 	app := fiber.New()
@@ -59,8 +59,7 @@ func main() {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})
 
-	app.Get("/auth/google/login", oauthHandler.Login)
-	app.Get("/auth/google/callback", oauthHandler.Callback)
+	app.Post("/auth/firebase", authHandler.FirebaseLogin)
 	app.Post("/auth/refresh", authHandler.Refresh)
 	app.Post("/auth/logout", authHandler.Logout)
 

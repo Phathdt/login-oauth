@@ -23,7 +23,7 @@ interface AuthState {
 }
 
 export interface AuthContextValue extends AuthState {
-  setTokens: (accessToken: string, user: User) => void
+  loginWithFirebase: (idToken: string) => Promise<void>
   updateAccessToken: (token: string) => void
   logout: () => Promise<void>
 }
@@ -37,7 +37,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading: true,
   })
 
-  // Keep a ref so interceptor callbacks always read latest token
   const tokenRef = useRef<string | null>(null)
 
   const setTokens = useCallback((accessToken: string, user: User) => {
@@ -55,6 +54,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ user: null, accessToken: null, isLoading: false })
   }, [])
 
+  const loginWithFirebase = useCallback(async (idToken: string) => {
+    const res = await apiClient.post<{ access_token: string; user: User }>('/auth/firebase', {
+      id_token: idToken,
+    })
+    setTokens(res.data.access_token, res.data.user)
+  }, [setTokens])
+
   const logout = useCallback(async () => {
     try {
       await apiClient.post('/auth/logout')
@@ -66,7 +72,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [clearAuth])
 
-  // Register callbacks with axios interceptor (no circular import)
   useEffect(() => {
     registerAuthCallbacks({
       getAccessToken: () => tokenRef.current,
@@ -75,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }, [updateAccessToken, clearAuth])
 
-  // On mount: restore session from HTTP-only refresh cookie via /auth/me
+  // Restore session from HTTP-only refresh cookie via /auth/me on mount
   useEffect(() => {
     apiClient
       .get<{ user: User; access_token: string }>('/auth/me')
@@ -94,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ ...state, setTokens, updateAccessToken, logout }}
+      value={{ ...state, loginWithFirebase, updateAccessToken, logout }}
     >
       {children}
     </AuthContext.Provider>

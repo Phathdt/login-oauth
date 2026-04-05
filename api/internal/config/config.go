@@ -8,13 +8,13 @@ import (
 )
 
 type Config struct {
-	Port               string
-	Env                string
-	DatabaseURL        string
-	GoogleClientID     string
-	GoogleClientSecret string
-	JWTSecret          string
-	FrontendURL        string
+	Port                   string
+	Env                    string
+	DatabaseURL            string
+	JWTSecret              string
+	FrontendURL            string
+	FirebaseProjectID      string
+	FirebaseCredentialsJSON string
 }
 
 func Load() *Config {
@@ -23,13 +23,13 @@ func Load() *Config {
 	}
 
 	cfg := &Config{
-		Port:               getEnv("PORT", "3000"),
-		Env:                getEnv("ENV", "development"),
-		DatabaseURL:        getEnv("DATABASE_URL", ""),
-		GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
-		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
-		JWTSecret:          getEnv("JWT_SECRET", ""),
-		FrontendURL:        getEnv("FRONTEND_URL", "http://localhost:5173"),
+		Port:                    getEnv("PORT", "3000"),
+		Env:                     getEnv("ENV", "development"),
+		DatabaseURL:             getEnv("DATABASE_URL", ""),
+		JWTSecret:               getEnv("JWT_SECRET", ""),
+		FrontendURL:             getEnv("FRONTEND_URL", "http://localhost:5173"),
+		FirebaseProjectID:       getEnv("FIREBASE_PROJECT_ID", ""),
+		FirebaseCredentialsJSON: getEnv("FIREBASE_CREDENTIALS_JSON", ""),
 	}
 
 	return cfg

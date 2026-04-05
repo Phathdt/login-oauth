@@ -1,7 +1,8 @@
 -- +goose Up
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  google_id VARCHAR(255) UNIQUE NOT NULL,
+  firebase_uid VARCHAR(255) UNIQUE NOT NULL,
+  provider VARCHAR(50) NOT NULL DEFAULT 'google',
   email VARCHAR(255) UNIQUE NOT NULL,
   name VARCHAR(255),
   picture VARCHAR(500),

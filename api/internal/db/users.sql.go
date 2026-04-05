@@ -13,25 +13,28 @@ import (
 )
 
 const findOrCreateUser = `-- name: FindOrCreateUser :one
-INSERT INTO users (google_id, email, name, picture)
-VALUES ($1, $2, $3, $4)
-ON CONFLICT (google_id) DO UPDATE
-  SET email = EXCLUDED.email,
+INSERT INTO users (firebase_uid, provider, email, name, picture)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (firebase_uid) DO UPDATE
+  SET provider = EXCLUDED.provider,
+      email = EXCLUDED.email,
       name = EXCLUDED.name,
       picture = EXCLUDED.picture
-RETURNING id, google_id, email, name, picture, created_at
+RETURNING id, firebase_uid, provider, email, name, picture, created_at
 `
 
 type FindOrCreateUserParams struct {
-	GoogleID string         `json:"google_id"`
-	Email    string         `json:"email"`
-	Name     sql.NullString `json:"name"`
-	Picture  sql.NullString `json:"picture"`
+	FirebaseUID string         `json:"firebase_uid"`
+	Provider    string         `json:"provider"`
+	Email       string         `json:"email"`
+	Name        sql.NullString `json:"name"`
+	Picture     sql.NullString `json:"picture"`
 }
 
 func (q *Queries) FindOrCreateUser(ctx context.Context, arg FindOrCreateUserParams) (User, error) {
 	row := q.db.QueryRowContext(ctx, findOrCreateUser,
-		arg.GoogleID,
+		arg.FirebaseUID,
+		arg.Provider,
 		arg.Email,
 		arg.Name,
 		arg.Picture,
@@ -39,7 +42,8 @@ func (q *Queries) FindOrCreateUser(ctx context.Context, arg FindOrCreateUserPara
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.GoogleID,
+		&i.FirebaseUID,
+		&i.Provider,
 		&i.Email,
 		&i.Name,
 		&i.Picture,
@@ -49,7 +53,7 @@ func (q *Queries) FindOrCreateUser(ctx context.Context, arg FindOrCreateUserPara
 }
 
 const findUserByID = `-- name: FindUserByID :one
-SELECT id, google_id, email, name, picture, created_at FROM users WHERE id = $1
+SELECT id, firebase_uid, provider, email, name, picture, created_at FROM users WHERE id = $1
 `
 
 func (q *Queries) FindUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -57,7 +61,8 @@ func (q *Queries) FindUserByID(ctx context.Context, id uuid.UUID) (User, error) 
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.GoogleID,
+		&i.FirebaseUID,
+		&i.Provider,
 		&i.Email,
 		&i.Name,
 		&i.Picture,

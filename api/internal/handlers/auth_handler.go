@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -13,12 +14,72 @@ import (
 )
 
 type AuthHandler struct {
-	cfg     *config.Config
-	queries *dbpkg.Queries
+	cfg            *config.Config
+	queries        *dbpkg.Queries
+	firebaseClient *auth.FirebaseClient
 }
 
-func NewAuthHandler(cfg *config.Config, queries *dbpkg.Queries) *AuthHandler {
-	return &AuthHandler{cfg: cfg, queries: queries}
+func NewAuthHandler(cfg *config.Config, queries *dbpkg.Queries, firebaseClient *auth.FirebaseClient) *AuthHandler {
+	return &AuthHandler{cfg: cfg, queries: queries, firebaseClient: firebaseClient}
+}
+
+type firebaseLoginRequest struct {
+	IDToken string `json:"id_token"`
+}
+
+// FirebaseLogin verifies a Firebase ID token, upserts the user, and returns a backend JWT.
+func (h *AuthHandler) FirebaseLogin(c *fiber.Ctx) error {
+	var req firebaseLoginRequest
+	if err := c.BodyParser(&req); err != nil || req.IDToken == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id_token is required"})
+	}
+
+	tokenInfo, err := h.firebaseClient.VerifyIDToken(c.Context(), req.IDToken)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid firebase token"})
+	}
+
+	user, err := h.queries.FindOrCreateUser(context.Background(), dbpkg.FindOrCreateUserParams{
+		FirebaseUID: tokenInfo.UID,
+		Provider:    tokenInfo.Provider,
+		Email:       tokenInfo.Email,
+		Name:        sql.NullString{String: tokenInfo.Name, Valid: tokenInfo.Name != ""},
+		Picture:     sql.NullString{String: tokenInfo.Picture, Valid: tokenInfo.Picture != ""},
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to upsert user"})
+	}
+
+	accessToken, err := auth.GenerateAccessToken(h.cfg, user)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate access token"})
+	}
+
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+	refreshToken, err := models.CreateRefreshToken(h.queries, user.ID.String(), expiresAt)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to create refresh token"})
+	}
+
+	c.Cookie(&fiber.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		HTTPOnly: true,
+		SameSite: "Lax",
+		Secure:   h.cfg.Env == "production",
+		MaxAge:   7 * 24 * 3600,
+		Path:     "/",
+	})
+
+	return c.JSON(fiber.Map{
+		"access_token": accessToken,
+		"user": fiber.Map{
+			"id":      user.ID.String(),
+			"email":   user.Email,
+			"name":    user.Name.String,
+			"picture": user.Picture.String,
+		},
+	})
 }
 
 func (h *AuthHandler) Refresh(c *fiber.Ctx) error {

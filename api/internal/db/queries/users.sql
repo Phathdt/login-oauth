@@ -1,8 +1,9 @@
 -- name: FindOrCreateUser :one
-INSERT INTO users (google_id, email, name, picture)
-VALUES ($1, $2, $3, $4)
-ON CONFLICT (google_id) DO UPDATE
-  SET email = EXCLUDED.email,
+INSERT INTO users (firebase_uid, provider, email, name, picture)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (firebase_uid) DO UPDATE
+  SET provider = EXCLUDED.provider,
+      email = EXCLUDED.email,
       name = EXCLUDED.name,
       picture = EXCLUDED.picture
 RETURNING *;
