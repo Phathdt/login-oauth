@@ -27,6 +27,20 @@ func NewPool(databaseURL string) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
+// NewSQLDB opens a *sql.DB using the pgx stdlib driver, suitable for use with sqlc-generated Queries.
+func NewSQLDB(databaseURL string) (*sql.DB, error) {
+	sqlDB, err := sql.Open("pgx", databaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("unable to open sql.DB: %w", err)
+	}
+
+	if err := sqlDB.Ping(); err != nil {
+		return nil, fmt.Errorf("unable to ping sql.DB: %w", err)
+	}
+
+	return sqlDB, nil
+}
+
 func RunMigrations(connStr string) error {
 	db, err := sql.Open("pgx", connStr)
 	if err != nil {

@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	dbpkg "github.com/phathdt/login-oauth/api/internal/db"
 	"github.com/phathdt/login-oauth/api/internal/config"
-	"github.com/phathdt/login-oauth/api/internal/models"
 )
 
 type Claims struct {
@@ -21,12 +21,12 @@ type contextKey string
 
 const ClaimsKey contextKey = "claims"
 
-func GenerateAccessToken(cfg *config.Config, user *models.User) (string, error) {
+func GenerateAccessToken(cfg *config.Config, user dbpkg.User) (string, error) {
 	claims := Claims{
-		UserID:  user.ID,
+		UserID:  user.ID.String(),
 		Email:   user.Email,
-		Name:    user.Name,
-		Picture: user.Picture,
+		Name:    user.Name.String,
+		Picture: user.Picture.String,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

@@ -9,24 +9,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/google/uuid"
+	dbpkg "github.com/phathdt/login-oauth/api/internal/db"
 )
-
-type RefreshToken struct {
-	ID        int        `json:"id"`
-	UserID    string     `json:"user_id"`
-	TokenHash string     `json:"-"`
-	ExpiresAt time.Time  `json:"expires_at"`
-	RevokedAt *time.Time `json:"revoked_at,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
-}
 
 func hashToken(plainToken string) string {
 	sum := sha256.Sum256([]byte(plainToken))
 	return hex.EncodeToString(sum[:])
 }
 
-func CreateRefreshToken(db *pgxpool.Pool, userID string, expiresAt time.Time) (string, error) {
+// CreateRefreshToken generates a random token, stores its hash via sqlc, and returns the plain token.
+func CreateRefreshToken(q *dbpkg.Queries, userID string, expiresAt time.Time) (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		return "", fmt.Errorf("failed to generate token bytes: %w", err)
@@ -35,10 +28,16 @@ func CreateRefreshToken(db *pgxpool.Pool, userID string, expiresAt time.Time) (s
 	plainToken := base64.URLEncoding.EncodeToString(b)
 	tokenHash := hashToken(plainToken)
 
-	_, err := db.Exec(context.Background(),
-		`INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
-		userID, tokenHash, expiresAt,
-	)
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return "", fmt.Errorf("invalid user id: %w", err)
+	}
+
+	_, err = q.CreateRefreshToken(context.Background(), dbpkg.CreateRefreshTokenParams{
+		UserID:    uid,
+		TokenHash: tokenHash,
+		ExpiresAt: expiresAt,
+	})
 	if err != nil {
 		return "", fmt.Errorf("failed to store refresh token: %w", err)
 	}
@@ -46,41 +45,23 @@ func CreateRefreshToken(db *pgxpool.Pool, userID string, expiresAt time.Time) (s
 	return plainToken, nil
 }
 
-func ValidateRefreshToken(db *pgxpool.Pool, plainToken string) (string, error) {
+// ValidateRefreshToken hashes the plain token and looks it up via sqlc (filters expired/revoked in SQL).
+func ValidateRefreshToken(q *dbpkg.Queries, plainToken string) (string, error) {
 	tokenHash := hashToken(plainToken)
 
-	var userID string
-	var expiresAt time.Time
-	var revokedAt *time.Time
-
-	err := db.QueryRow(context.Background(),
-		`SELECT user_id, expires_at, revoked_at FROM refresh_tokens WHERE token_hash = $1`,
-		tokenHash,
-	).Scan(&userID, &expiresAt, &revokedAt)
-
+	rt, err := q.FindRefreshToken(context.Background(), tokenHash)
 	if err != nil {
-		return "", fmt.Errorf("refresh token not found")
+		return "", fmt.Errorf("refresh token not found or expired")
 	}
 
-	if revokedAt != nil {
-		return "", fmt.Errorf("refresh token has been revoked")
-	}
-
-	if time.Now().After(expiresAt) {
-		return "", fmt.Errorf("refresh token has expired")
-	}
-
-	return userID, nil
+	return rt.UserID.String(), nil
 }
 
-func RevokeRefreshToken(db *pgxpool.Pool, plainToken string) error {
+// RevokeRefreshToken hashes the plain token and marks it revoked via sqlc.
+func RevokeRefreshToken(q *dbpkg.Queries, plainToken string) error {
 	tokenHash := hashToken(plainToken)
 
-	_, err := db.Exec(context.Background(),
-		`UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = $1`,
-		tokenHash,
-	)
-	if err != nil {
+	if err := q.RevokeRefreshToken(context.Background(), tokenHash); err != nil {
 		return fmt.Errorf("failed to revoke refresh token: %w", err)
 	}
 

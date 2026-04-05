@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,20 +12,20 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/phathdt/login-oauth/api/internal/auth"
 	"github.com/phathdt/login-oauth/api/internal/config"
+	dbpkg "github.com/phathdt/login-oauth/api/internal/db"
 	"github.com/phathdt/login-oauth/api/internal/models"
 )
 
 type OAuthHandler struct {
 	cfg         *config.Config
 	oauthConfig *oauth2.Config
-	db          *pgxpool.Pool
+	queries     *dbpkg.Queries
 }
 
-func NewOAuthHandler(cfg *config.Config, oauthConfig *oauth2.Config, db *pgxpool.Pool) *OAuthHandler {
-	return &OAuthHandler{cfg: cfg, oauthConfig: oauthConfig, db: db}
+func NewOAuthHandler(cfg *config.Config, oauthConfig *oauth2.Config, queries *dbpkg.Queries) *OAuthHandler {
+	return &OAuthHandler{cfg: cfg, oauthConfig: oauthConfig, queries: queries}
 }
 
 func (h *OAuthHandler) Login(c *fiber.Ctx) error {
@@ -54,7 +55,12 @@ func (h *OAuthHandler) Callback(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to fetch user info"})
 	}
 
-	user, err := models.FindOrCreateByGoogle(h.db, userInfo.Sub, userInfo.Email, userInfo.Name, userInfo.Picture)
+	user, err := h.queries.FindOrCreateUser(context.Background(), dbpkg.FindOrCreateUserParams{
+		GoogleID: userInfo.Sub,
+		Email:    userInfo.Email,
+		Name:     sql.NullString{String: userInfo.Name, Valid: userInfo.Name != ""},
+		Picture:  sql.NullString{String: userInfo.Picture, Valid: userInfo.Picture != ""},
+	})
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to upsert user"})
 	}
@@ -65,7 +71,7 @@ func (h *OAuthHandler) Callback(c *fiber.Ctx) error {
 	}
 
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
-	refreshToken, err := models.CreateRefreshToken(h.db, user.ID, expiresAt)
+	refreshToken, err := models.CreateRefreshToken(h.queries, user.ID.String(), expiresAt)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to create refresh token"})
 	}
