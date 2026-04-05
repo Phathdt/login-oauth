@@ -89,6 +89,8 @@ func extractProvider(token *firebaseauth.Token) string {
 				return "microsoft"
 			case "password":
 				return "email"
+			case "phone":
+				return "phone"
 			default:
 				return p
 			}

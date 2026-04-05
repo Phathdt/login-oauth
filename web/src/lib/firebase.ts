@@ -6,6 +6,9 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  signInWithPhoneNumber,
+  RecaptchaVerifier,
+  type ConfirmationResult,
 } from 'firebase/auth'
 import type { User as FirebaseUser } from 'firebase/auth'
 
@@ -21,9 +24,7 @@ export const firebaseAuth = getAuth(app)
 const googleProvider = new GoogleAuthProvider()
 const githubProvider = new GithubAuthProvider()
 
-async function signInWithProvider(
-  provider: GoogleAuthProvider | GithubAuthProvider
-): Promise<string> {
+async function signInWithProvider(provider: GoogleAuthProvider | GithubAuthProvider): Promise<string> {
   const result = await signInWithPopup(firebaseAuth, provider)
   return result.user.getIdToken()
 }
@@ -46,4 +47,23 @@ export async function signUpWithEmail(email: string, password: string): Promise<
   return result.user.getIdToken()
 }
 
-export type { FirebaseUser }
+// Phone auth — step 1: send OTP
+// containerId must be the ID of a DOM element to anchor the invisible reCAPTCHA
+export async function sendPhoneOTP(
+  phoneNumber: string,
+  containerId: string
+): Promise<ConfirmationResult> {
+  const verifier = new RecaptchaVerifier(firebaseAuth, containerId, { size: 'invisible' })
+  return signInWithPhoneNumber(firebaseAuth, phoneNumber, verifier)
+}
+
+// Phone auth — step 2: confirm OTP, return Firebase ID token
+export async function confirmPhoneOTP(
+  confirmation: ConfirmationResult,
+  otp: string
+): Promise<string> {
+  const result = await confirmation.confirm(otp)
+  return result.user.getIdToken()
+}
+
+export type { FirebaseUser, ConfirmationResult }

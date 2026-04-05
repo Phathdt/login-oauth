@@ -1,6 +1,6 @@
 # login-oauth
 
-Full-stack authentication demo using Firebase Authentication with Go (Fiber) backend and React (TypeScript) frontend. Supports Google, GitHub, and Email/Password sign-in.
+Full-stack authentication demo using Firebase Authentication with Go (Fiber) backend and React (TypeScript) frontend. Supports Google, GitHub, Email/Password, and Phone (OTP) sign-in.
 
 ## Stack
 
@@ -101,8 +101,9 @@ React                            Go Backend
 ### 1. Firebase Console
 
 1. Create a project at [console.firebase.google.com](https://console.firebase.google.com)
-2. **Authentication → Sign-in method** → enable: Email/Password, Google, GitHub
+2. **Authentication → Sign-in method** → enable: Email/Password, Google, GitHub, Phone
    - For GitHub: create a GitHub OAuth App at [github.com/settings/developers](https://github.com/settings/developers), set callback URL to `https://your-project.firebaseapp.com/__/auth/handler`
+   - For Phone: Firebase Console → Authentication → Settings → enable **reCAPTCHA Enterprise** (or accept the v2 fallback for dev)
 3. **Project settings → Service accounts → Generate new private key** (for backend `FIREBASE_CREDENTIALS_JSON`)
 4. **Project settings → General → Your apps → Web** → Register app (for frontend `VITE_FIREBASE_*` values)
 
